@@ -439,13 +439,18 @@ export class AudioEngine {
     prepareAudioPlayback();
     await this.ctx.resume();
     if (!this.recorder) {
-      await this.ctx.audioWorklet.addModule("/audio/recorder.js");
+      await this.ctx.audioWorklet.addModule(
+        new URL("audio/recorder.js", document.baseURI).href,
+      );
       this.recorder = new AudioWorkletNode(this.ctx, "session-recorder");
       this.master.connect(this.recorder);
       this.recorder.connect(this.ctx.destination);
     }
     this.worker?.terminate();
-    this.worker = new Worker("/audio/encoder.js", { type: "module" });
+    this.worker = new Worker(
+      new URL("audio/encoder.js", document.baseURI).href,
+      { type: "module" },
+    );
     this.worker.onmessage = ({ data }) => {
       if (data.error)
         this.onError("Recording could not be encoded. Please try again.");

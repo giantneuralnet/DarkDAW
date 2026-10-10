@@ -2,6 +2,9 @@
 const VERSION = "__BUILD_VERSION__";
 const ASSETS = __BUILD_ASSETS__;
 const PREFIX = "session-daw-shell-";
+const SCOPE = self.registration
+  ? new URL(self.registration.scope).pathname
+  : "/";
 const CACHE = PREFIX + VERSION;
 const paths = new Set(ASSETS);
 
@@ -27,7 +30,7 @@ self.addEventListener("install", (event) =>
             }),
           );
         }
-        const response = await fetch("/", {
+        const response = await fetch(SCOPE, {
           credentials: "same-origin",
           cache: "reload",
         });
@@ -37,7 +40,7 @@ self.addEventListener("install", (event) =>
           !(await response.clone().text()).includes('data-session-shell="1"')
         )
           throw Error("Session shell is unavailable.");
-        await cache.put("/", response);
+        await cache.put(SCOPE, response);
       } catch (error) {
         await caches.delete(CACHE);
         throw error;
@@ -63,13 +66,13 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (event.request.method !== "GET" || url.origin !== self.location.origin)
     return;
-  const isShell = event.request.mode === "navigate" && url.pathname === "/";
+  const isShell = event.request.mode === "navigate" && url.pathname === SCOPE;
   if (!isShell && !paths.has(url.pathname)) return;
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE);
       return (
-        (await cache.match(isShell ? "/" : url.pathname)) ||
+        (await cache.match(isShell ? SCOPE : url.pathname)) ||
         fetch(event.request)
       );
     })(),

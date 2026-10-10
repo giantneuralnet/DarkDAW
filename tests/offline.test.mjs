@@ -4,7 +4,7 @@ import fs from "node:fs";
 import vm from "node:vm";
 import ts from "typescript";
 
-function workerHarness() {
+function workerHarness(base = "/") {
   const stores = new Map(),
     handlers = {},
     clients = [];
@@ -37,6 +37,7 @@ function workerHarness() {
   };
   const self = {
     location: { origin: "https://session.test" },
+    registration: { scope: "https://session.test" + base },
     addEventListener: (name, fn) => (handlers[name] = fn),
     clients: {
       async matchAll() {
@@ -56,14 +57,15 @@ function workerHarness() {
     const path =
       typeof request === "string" ? request : new URL(request.url).pathname;
     return new Response(
-      path === "/"
+      path === base
         ? badShell
           ? "Sign in"
           : '<body data-session-shell="1">Session</body>'
         : "/* audio asset */",
       {
         headers: {
-          "content-type": path === "/" ? "text/html" : "application/javascript",
+          "content-type":
+            path === base ? "text/html" : "application/javascript",
         },
       },
     );
@@ -76,11 +78,11 @@ function workerHarness() {
     .replace('"__BUILD_VERSION__"', '"test-version"')
     .replace(
       "__BUILD_ASSETS__",
-      JSON.stringify([
-        "/audio/microphone.js",
-        "/audio/encoder.js",
-        "/_next/static/page.js",
-      ]),
+      JSON.stringify(
+        ["audio/microphone.js", "audio/encoder.js", "_next/static/page.js"].map(
+          (path) => base + path,
+        ),
+      ),
     );
   vm.runInNewContext(script, {
     self,
@@ -194,7 +196,7 @@ function target() {
 }
 test("app checks for updates only at launch and saves before an idle reload", async () => {
   const window = target(),
-    document = target(),
+    document = { ...target(), baseURI: "https://session.test/" },
     serviceWorker = { ...target(), controller: {} };
   const timers = [];
   let checks = 0,
@@ -223,6 +225,7 @@ test("app checks for updates only at launch and saves before an idle reload", as
     })
     .outputText.replace("export function", "function");
   const start = vm.runInNewContext(compiled + "\nstartOfflineApp", {
+    URL,
     navigator: { serviceWorker, onLine: true },
     window,
     document,
@@ -291,4 +294,29 @@ test("deployment includes installable icons, a versioned cache, and all audio wo
     "resynthesis.worker-",
   ])
     assert.ok(sw.includes(asset));
+});
+
+test("GitHub Pages offline cache serves the project path and leaves the domain root alone", async () => {
+  const h = workerHarness("/DarkDAW/");
+  await h.dispatch("install");
+  await h.dispatch("activate");
+  h.setOffline(true);
+  const request = (path, mode = "navigate") => ({
+    url: "https://session.test" + path,
+    method: "GET",
+    mode,
+  });
+  assert.match(
+    await (await h.dispatch("fetch", { request: request("/DarkDAW/") })).text(),
+    /data-session-shell/,
+  );
+  assert.equal(
+    (
+      await h.dispatch("fetch", {
+        request: request("/DarkDAW/audio/encoder.js", "cors"),
+      })
+    ).status,
+    200,
+  );
+  assert.equal(await h.dispatch("fetch", { request: request("/") }), undefined);
 });

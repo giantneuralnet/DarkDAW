@@ -52,7 +52,10 @@ export function startOfflineApp(options: {
   window.addEventListener("input", input);
   const timer = setInterval(applyPendingUpdate, 10000);
   void navigator.serviceWorker
-    .register("/sw.js", { scope: "/", updateViaCache: "none" })
+    .register(new URL("sw.js", document.baseURI).href, {
+      scope: new URL("./", document.baseURI).pathname,
+      updateViaCache: "none",
+    })
     .then((r) => {
       if (disposed) return;
       registration = r;

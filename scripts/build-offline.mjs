@@ -1,7 +1,18 @@
 import { readFile, writeFile, readdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { resolve, relative } from "node:path";
-const root = resolve("dist/client");
+const root = resolve(process.argv[2] || "dist/client");
+const base = process.argv[3] || "/";
+const manifestPath = resolve(root, "manifest.webmanifest");
+const manifest = JSON.parse(
+  await readFile("public/manifest.webmanifest", "utf8"),
+);
+manifest.id = manifest.start_url = manifest.scope = base;
+manifest.icons = manifest.icons.map((icon) => ({
+  ...icon,
+  src: base + icon.src.replace(/^\//, ""),
+}));
+await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
 async function files(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
   return (
@@ -28,12 +39,16 @@ for (const path of assets) {
 }
 const template = await readFile("scripts/service-worker.js", "utf8");
 hash.update(template);
+hash.update(base);
+try {
+  hash.update(await readFile(resolve(root, "index.html")));
+} catch {}
 const version = hash.digest("hex").slice(0, 16);
 const worker = template
   .replace('"__BUILD_VERSION__"', JSON.stringify(version))
   .replace(
     "__BUILD_ASSETS__",
-    JSON.stringify(assets.map((path) => "/" + relative(root, path))),
+    JSON.stringify(assets.map((path) => base + relative(root, path))),
   );
 await writeFile(resolve(root, "sw.js"), worker);
 await writeFile(

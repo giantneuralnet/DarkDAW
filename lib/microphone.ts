@@ -49,7 +49,9 @@ export class MicrophoneRecording {
         return;
       }
       this.stream = stream;
-      await ctx.audioWorklet.addModule("/audio/microphone.js");
+      await ctx.audioWorklet.addModule(
+        new URL("audio/microphone.js", document.baseURI).href,
+      );
       if (this.cancelled) return;
       this.worklet = new AudioWorkletNode(ctx, "instrument-microphone");
       this.source = ctx.createMediaStreamSource(stream);

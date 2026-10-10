@@ -26,6 +26,7 @@ function environment(
       else delete globalThis[key];
     }
   });
+  replace("document", { baseURI: "https://session.test/DarkDAW/" });
   const events = [];
   let type = "auto",
     worklet,

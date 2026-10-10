@@ -100,6 +100,7 @@ class Context {
   async close() {}
 }
 globalThis.AudioContext = Context;
+globalThis.document = { baseURI: "https://session.test/DarkDAW/" };
 test("automatic previews are suppressed during playback and a pending resume cannot race transport", async () => {
   const p = initialProject(),
     e = new AudioEngine(p);
